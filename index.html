@@ -1,0 +1,1843 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЛЭП Детектор</title>
+<style>
+/* ═══ RESET & BASE ═══════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --bg:        #0d0f14;
+    --surface:   #141720;
+    --surface2:  #1a1e2b;
+    --border:    #252a38;
+    --border2:   #2e3548;
+    --accent:    #e8412a;
+    --accent2:   #ff6347;
+    --blue:      #2563eb;
+    --blue2:     #3b82f6;
+    --purple:    #7c3aed;
+    --purple2:   #9b5cf0;
+    --green:     #16a34a;
+    --green2:    #22c55e;
+    --text:      #e2e8f0;
+    --text2:     #94a3b8;
+    --text3:     #475569;
+    --radius:    8px;
+    --sidebar-w: 290px;
+}
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ═══ CANVAS ═══════════════════════════════════════════════ */
+#canvas-wrap {
+    position: fixed; inset: 0;
+    left: var(--sidebar-w);
+    bottom: 28px;
+}
+canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* ═══ SIDEBAR ══════════════════════════════════════════════ */
+#sidebar {
+    position: fixed; top: 0; left: 0; bottom: 28px;
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column;
+    z-index: 20;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Logo header ── */
+.sidebar-header {
+    padding: 16px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #0d0f14 0%, #141a2a 100%);
+    flex-shrink: 0;
+}
+.logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), #ff8c00);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+}
+.logo-text { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.logo-sub  { font-size: 10px; color: var(--text3); font-weight: 400; }
+
+/* ── Sections ── */
+.section {
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.section-title {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--text3);
+    margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.section-title .badge {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 1px 6px;
+    font-size: 9px; color: var(--text2); letter-spacing: 0;
+    text-transform: none; font-weight: 500;
+}
+
+/* ── File drop zone ── */
+.drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+}
+.drop-zone:hover { border-color: var(--accent); background: rgba(232,65,42,0.05); }
+.drop-zone.has-file {
+    border-color: var(--green2); border-style: solid;
+    background: rgba(22,163,74,0.06);
+}
+.drop-zone.has-file .drop-icon { color: var(--green2); }
+.drop-icon { font-size: 22px; margin-bottom: 4px; color: var(--text3); }
+.drop-main { font-size: 12px; color: var(--text2); font-weight: 500; }
+.drop-sub  { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.drop-filename { font-size: 11px; color: var(--green2); font-weight: 600; margin-top: 2px; word-break: break-all; }
+input[type="file"] { display: none; }
+
+/* ── Buttons ── */
+.btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 9px 14px; border: none; border-radius: var(--radius);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all 0.18s; letter-spacing: 0.2px; line-height: 1;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.btn-primary  { background: var(--accent); color: #fff; }
+.btn-primary:hover  { background: #c9341f; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(232,65,42,0.3); }
+.btn-blue     { background: var(--blue); color: #fff; }
+.btn-blue:hover     { background: #1d4fd8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+.btn-purple   { background: var(--purple); color: #fff; }
+.btn-purple:hover   { background: #6d28d9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
+.btn-ghost    { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover    { background: var(--border); color: var(--text); }
+.btn + .btn { margin-top: 6px; }
+
+/* ── Progress ── */
+.progress-wrap { display: none; margin-top: 8px; }
+.progress-track { background: var(--surface2); border-radius: 4px; height: 4px; overflow: hidden; border: 1px solid var(--border2); }
+.progress-fill  { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), #ff8c00); transition: width 0.3s ease; width: 0%; }
+.progress-label { font-size: 10px; color: var(--text3); margin-top: 5px; }
+
+/* ── Spinner ── */
+.spinner {
+    width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.65s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tabs ── */
+.tab-bar {
+    display: flex; gap: 2px;
+    background: var(--surface2); border-radius: var(--radius);
+    padding: 3px;
+}
+.tab-btn {
+    flex: 1; padding: 6px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    background: transparent; border: none; color: var(--text3);
+    transition: all 0.15s;
+}
+.tab-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+
+/* ── Filter params panel (collapsible) ── */
+.collapsible { overflow: hidden; }
+.collapsible-inner { padding-top: 2px; }
+.collapse-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; padding: 6px 8px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); margin-bottom: 8px;
+    font-size: 11px; font-weight: 600; color: var(--text2);
+    transition: all 0.15s; user-select: none;
+}
+.collapse-toggle:hover { color: var(--text); border-color: var(--border); }
+.collapse-arrow { font-size: 10px; transition: transform 0.2s; }
+.collapse-arrow.open { transform: rotate(180deg); }
+
+/* ── Slider rows ── */
+.param-group { display: flex; flex-direction: column; gap: 8px; }
+.param-item { display: flex; flex-direction: column; gap: 3px; }
+.param-header { display: flex; justify-content: space-between; align-items: baseline; }
+.param-name  { font-size: 11px; color: var(--text2); }
+.param-value { font-size: 11px; font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.param-hint  { font-size: 9px; color: var(--text3); }
+input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; background: var(--border2);
+    border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(232,65,42,0.2);
+    transition: box-shadow 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 5px rgba(232,65,42,0.3);
+}
+
+/* ── Select ── */
+select {
+    width: 100%; padding: 6px 8px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text); font-size: 11px;
+    outline: none; cursor: pointer;
+}
+select:focus { border-color: var(--accent); }
+
+/* ── Checkbox ── */
+.check-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.check-item input { accent-color: var(--accent); cursor: pointer; width: 13px; height: 13px; }
+.check-item span { font-size: 11px; color: var(--text2); }
+
+/* ── Stats block ── */
+.stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px; margin-bottom: 6px;
+}
+.stat-card {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 8px 10px;
+}
+.stat-card-label { font-size: 9px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card-value { font-size: 16px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.cv-ground { color: #c9a87a; }
+.cv-veg    { color: #4ade80; }
+.cv-pw     { color: #ff6347; }
+.cv-misc   { color: #94a3b8; }
+
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 11px; border-bottom: 1px solid var(--border); }
+.stat-row:last-child { border-bottom: none; }
+.stat-row-label { color: var(--text3); }
+.stat-row-value { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── Legend ── */
+.legend-list { display: flex; flex-direction: column; gap: 5px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); }
+.legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Filter summary ── */
+.filter-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: 10px; margin-bottom: 6px;
+}
+.filter-badge.ok  { background: rgba(22,163,74,0.15); color: var(--green2); border: 1px solid rgba(34,197,94,0.3); }
+.filter-badge.warn { background: rgba(232,65,42,0.15); color: var(--accent2); border: 1px solid rgba(232,65,42,0.3); }
+
+.cluster-mini {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); overflow: hidden; margin-top: 6px;
+}
+.cluster-mini table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.cluster-mini th { padding: 5px 6px; color: var(--text3); font-weight: 600; text-align: left; background: var(--bg); border-bottom: 1px solid var(--border); }
+.cluster-mini td { padding: 4px 6px; border-bottom: 1px solid var(--border); color: var(--text2); }
+.cluster-mini tr:last-child td { border-bottom: none; }
+.cluster-mini .real  { color: var(--green2); }
+.cluster-mini .false { color: var(--accent2); }
+
+/* ── Viewer controls ── */
+.viewer-controls { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── STATUS BAR ─────────────────────────────────────────── */
+#statusbar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 28px;
+    background: var(--bg); border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px;
+    gap: 24px; font-size: 10px; color: var(--text3); z-index: 20;
+}
+.sb-sep { color: var(--border2); }
+.sb-val { color: var(--text2); font-weight: 600; }
+#sb-api { margin-left: auto; }
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+#toast {
+    position: fixed; bottom: 40px; left: 50%; z-index: 200;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 9px 16px;
+    font-size: 12px; font-weight: 500; color: var(--text);
+    opacity: 0; pointer-events: none; white-space: nowrap;
+    transition: all 0.22s; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: flex; align-items: center; gap: 8px;
+}
+#toast::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.ok::before  { background: var(--green2); }
+#toast.err::before { background: var(--accent); }
+
+/* ─── OVERLAY ─────────────────────────────────────────────── */
+#loading-overlay {
+    position: fixed; inset: 0; left: var(--sidebar-w); bottom: 28px;
+    background: rgba(13,15,20,0.7); z-index: 15;
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+}
+#loading-overlay .ol-spinner {
+    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+#loading-overlay .ol-text { font-size: 13px; color: var(--text2); }
+#loading-overlay .ol-sub  { font-size: 11px; color: var(--text3); }
+
+.btn-veg { background: #15803d; color: #fff; }
+.btn-veg:hover { background: #166534; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(21,128,61,0.3); }
+.btn-veg:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.btn-veg-clear { background: var(--surface2); color: var(--green2); border: 1px solid var(--green2); font-size:12px; font-weight:600; padding:7px 14px; }
+.btn-veg-clear:hover { background: rgba(34,197,94,0.1); }
+
+/* ─── LOD INDICATOR ──────────────────────────────────────── */
+#lod-indicator {
+    position: fixed; top: 12px; right: 12px; z-index: 15;
+    background: rgba(13,15,20,0.8); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 5px 10px;
+    font-size: 10px; color: var(--text3); display: none;
+    backdrop-filter: blur(4px);
+}
+#lod-indicator .lod-val { color: var(--text2); font-weight: 600; }
+
+/* ═══ SAFETY ZONES ══════════════════════════════════════ */
+.btn-safety { background: var(--purple); color: #fff; }
+.btn-safety:hover { background: var(--purple2); }
+.btn-safety:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; }
+.btn-safety-clear { background: transparent; color: var(--text3);
+    border: 1px solid var(--border2); }
+.btn-safety-clear:hover { border-color: var(--text2); color: var(--text2); }
+.zones-info { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.6; }
+.zones-info b { color: var(--purple2); }
+</style>
+</head>
+<body>
+
+<!-- ═══ CANVAS ═══ -->
+<div id="canvas-wrap"></div>
+
+<!-- ═══ LOADING OVERLAY ═══ -->
+<div id="loading-overlay">
+    <div class="ol-spinner"></div>
+    <div class="ol-text" id="ol-text">Обработка...</div>
+    <div class="ol-sub"  id="ol-sub"></div>
+</div>
+
+<!-- ═══ LOD INDICATOR ═══ -->
+<div id="lod-indicator">LOD: <span class="lod-val" id="lod-val">1:1</span> · <span id="lod-pts">—</span> точек</div>
+
+<!-- ═══ SIDEBAR ═══ -->
+<div id="sidebar">
+
+    <!-- Header -->
+    <div class="sidebar-header">
+        <div class="logo-icon">⚡</div>
+        <div>
+            <div class="logo-text">ЛЭП Детектор</div>
+            <div class="logo-sub">LAS Point Cloud Classifier</div>
+        </div>
+    </div>
+
+    <!-- Tab bar (no section padding, no extra margin) -->
+    <div style="padding:10px 12px 0; border-bottom:1px solid var(--border); flex-shrink:0;">
+        <div class="tab-bar">
+            <button class="tab-btn active" id="tab-classify-btn" >Классификация</button>
+            <button class="tab-btn"        id="tab-view-btn"     >Просмотр LAS</button>
+        </div>
+    </div>
+
+    <!-- === TAB: CLASSIFY === -->
+    <div id="tab-classify" class="section">
+        <label class="drop-zone" id="drop-zone-cls" for="las-input">
+            <div class="drop-icon" id="drop-icon-cls">📂</div>
+            <div class="drop-main" id="drop-main-cls">Выберите .las файл</div>
+            <div class="drop-sub" id="drop-sub-cls">или перетащите сюда</div>
+            <div class="drop-filename" id="drop-fname-cls" style="display:none"></div>
+        </label>
+        <input type="file" id="las-input" accept=".las">
+
+        <label class="check-item" style="margin-bottom:6px;">
+            <input type="checkbox" id="p-filter-enabled" checked>
+            <span>Применять фильтрацию при классификации</span>
+        </label>
+
+        <button class="btn btn-primary" id="btn-classify" disabled>Классифицировать</button>
+        <button class="btn btn-ghost"   id="btn-reset"    style="display:none">✕ Сбросить</button>
+
+        <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <div class="progress-label" id="progress-label">...</div>
+        </div>
+    </div>
+
+    <!-- === TAB: VIEW === -->
+    <div id="tab-view" class="section" style="display:none">
+        <label class="drop-zone" id="drop-zone-view" for="view-input">
+            <div class="drop-icon" id="drop-icon-view">📂</div>
+            <div class="drop-main" id="drop-main-view">Классифицированный .las</div>
+            <div class="drop-sub" id="drop-sub-view">выберите или перетащите</div>
+            <div class="drop-filename" id="drop-fname-view" style="display:none"></div>
+        </label>
+        <input type="file" id="view-input" accept=".las">
+        <button class="btn btn-blue"   id="btn-view"        disabled>Открыть</button>
+        <button class="btn btn-purple" id="btn-view-filter" disabled>⚗ Применить фильтр к LAS</button>
+        <div class="progress-wrap" id="progress-wrap-view">
+            <div class="progress-track"><div class="progress-fill" id="progress-fill-view"></div></div>
+            <div class="progress-label" id="progress-label-view">...</div>
+        </div>
+    </div>
+
+    <!-- Shared filter params -->
+    <div class="section">
+        <div class="collapse-toggle" >
+            <span>⚙ Параметры фильтрации ЛЭП</span>
+            <span class="collapse-arrow" id="filter-arrow">▾</span>
+        </div>
+        <div id="filter-panel" style="display:none; margin-top:10px;">
+            <div class="param-group">
+                <div class="param-item">
+                    <div class="param-header">
+                        <span class="param-name">Линейность кластера</span>
+                        <span class="param-value" id="v-lin">0.80</span>
+                    </div>
+                    <input type="range" id="p-lin" min="0.5" max="0.98" step="0.01" value="0.80"
+                        >
+                    <span class="param-hint">↑ строже (рек. 0.75–0.90)</span>
+                </div>
+                <div class="param-item">
+                    <div class="param-header">
+                        <span class="param-name">Вытянутость</span>
+                        <span class="param-value" id="v-elong">3.0</span>
+                    </div>
+                    <input type="range" id="p-elong" min="1.0" max="15.0" step="0.5" value="3.0"
+                        >
+                    <span class="param-hint">длина/ширина кластера (рек. 3–6)</span>
+                </div>
+                <div class="param-item">
+                    <div class="param-header">
+                        <span class="param-name">Мин. точек в кластере</span>
+                        <span class="param-value" id="v-minpts">10</span>
+                    </div>
+                    <input type="range" id="p-minpts" min="2" max="100" step="1" value="10"
+                        >
+                    <span class="param-hint">меньше → ложный кластер</span>
+                </div>
+                <div class="param-item">
+                    <div class="param-header">
+                        <span class="param-name">Радиус DBSCAN (м)</span>
+                        <span class="param-value" id="v-eps">0.8</span>
+                    </div>
+                    <input type="range" id="p-eps" min="0.1" max="5.0" step="0.1" value="0.8"
+                        >
+                    <span class="param-hint">радиус соседства DBSCAN</span>
+                </div>
+                <div class="param-item">
+                    <div class="param-header">
+                        <span class="param-name">Класс для ложных точек</span>
+                    </div>
+                    <select id="p-fallback">
+                        <option value="1">1 — Unclassified</option>
+                        <option value="2">2 — Ground</option>
+                        <option value="4">4 — Medium vegetation</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section" id="stats-section" style="display:none">
+        <div class="section-title">Результат <span class="badge" id="stats-badge">—</span></div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-card-label">Земля</div>
+                <div class="stat-card-value cv-ground" id="s-ground">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Растительность</div>
+                <div class="stat-card-value cv-veg" id="s-veg">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Провода ЛЭП</div>
+                <div class="stat-card-value cv-pw" id="s-pw">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Время</div>
+                <div class="stat-card-value cv-misc" id="s-time">—</div>
+            </div>
+        </div>
+        <div class="stat-row">
+            <span class="stat-row-label">Всего точек</span>
+            <span class="stat-row-value" id="s-total">—</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-row-label">Отображено</span>
+            <span class="stat-row-value" id="s-shown">—</span>
+        </div>
+        <!-- Filter result -->
+        <div id="filter-result" style="display:none; margin-top:8px;">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Фильтрация ЛЭП</div>
+            <div class="stat-row">
+                <span class="stat-row-label">До фильтрации</span>
+                <span class="stat-row-value" id="fr-before">—</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-row-label">После фильтрации</span>
+                <span class="stat-row-value cv-pw" id="fr-after">—</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-row-label">Убрано ложных</span>
+                <span class="stat-row-value cv-veg" id="fr-removed">—</span>
+            </div>
+            <div class="cluster-mini" id="cluster-mini" style="display:none">
+                <table>
+                    <thead><tr><th>Точек</th><th>Лин.</th><th>Вытян.</th><th>Статус</th></tr></thead>
+                    <tbody id="cluster-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- View classes list -->
+    <div class="section" id="view-classes-section" style="display:none">
+        <div class="section-title">Классы в файле</div>
+        <div id="view-classes-list"></div>
+    </div>
+
+
+    <!-- Safety zones section -->
+    <div class="section" id="safety-section">
+        <div class="section-title">
+            ⚡ Охранные зоны ЛЭП
+            <span class="badge" id="zones-badge" style="display:none"></span>
+        </div>
+
+        <div class="param-item" style="margin-bottom:8px;">
+            <div class="param-header">
+                <span class="param-name">Расстояние от провода (м)</span>
+                <span class="param-value" id="v-zdist">5.0</span>
+            </div>
+            <input type="range" id="p-zdist" min="0.5" max="30" step="0.5" value="5.0"
+                >
+        </div>
+
+        <div class="param-item" style="margin-bottom:10px;">
+            <div class="param-header">
+                <span class="param-name">Прозрачность плоскостей</span>
+                <span class="param-value" id="v-zopa">0.25</span>
+            </div>
+            <input type="range" id="p-zopa" min="0.05" max="0.8" step="0.05" value="0.25"
+                >
+        </div>
+
+        <button class="btn btn-safety" id="btn-zones" disabled>
+            Построить охранные зоны
+        </button>
+        <button class="btn btn-safety-clear" id="btn-zones-clear"
+            style="display:none; margin-top:4px;" >
+            Скрыть зоны
+        </button>
+
+        <div class="zones-info" id="zones-info" style="display:none"></div>
+
+        <!-- Vegetation projection -->
+        <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">
+                🌿 Анализ зарастания просеки
+            </div>
+            <div class="param-item" style="margin-bottom:8px;">
+                <div class="param-header">
+                    <span class="param-name">Полуширина просеки (м)</span>
+                    <span class="param-value" id="v-vegdist">5.0</span>
+                </div>
+                <input type="range" id="p-vegdist" min="1" max="40" step="0.5" value="5.0">
+            </div>
+            <div class="param-item" style="margin-bottom:8px;">
+                <div class="param-header">
+                    <span class="param-name">Опустить плоскость (от провиса)</span>
+                    <span class="param-value" id="v-veght">—</span>
+                </div>
+                <input type="range" id="p-veght" min="0" max="1" step="0.1" value="0" disabled>
+                <span class="param-hint">0 = уровень провиса; макс = до земли</span>
+            </div>
+            <div class="param-item" style="margin-bottom:10px;">
+                <div class="param-header">
+                    <span class="param-name">Прозрачность плоскости</span>
+                    <span class="param-value" id="v-vegopa">0.30</span>
+                </div>
+                <input type="range" id="p-vegopa" min="0.05" max="0.85" step="0.05" value="0.30">
+            </div>
+            <button class="btn btn-veg" id="btn-veg-proj" disabled>
+                Показать проекцию растительности
+            </button>
+            <button class="btn btn-veg-clear" id="btn-veg-clear"
+                style="display:none; margin-top:4px;" >
+                Скрыть проекцию
+            </button>
+            <div class="zones-info" id="veg-info" style="display:none"></div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="section">
+        <div class="section-title">Легенда</div>
+        <div class="legend-list">
+            <div class="legend-item"><div class="legend-dot" style="background:#c9a87a"></div>Земля (cls 2)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#2E8B57"></div>Растительность (cls 4)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#FF3300"></div>Провода ЛЭП (cls 14)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#888"></div>Неклассифицировано</div>
+        </div>
+    </div>
+
+    <!-- Viewer settings -->
+    <div class="section">
+        <div class="section-title">Вьювер</div>
+        <div class="viewer-controls">
+            <div class="param-item">
+                <div class="param-header">
+                    <span class="param-name">Размер точек</span>
+                    <span class="param-value" id="v-ptsize">авто</span>
+                </div>
+                <input type="range" id="pt-size" min="0.01" max="2.0" step="0.01" value="0.3"
+                    >
+            </div>
+            <div class="param-item">
+                <div class="param-header">
+                    <span class="param-name">Яркость</span>
+                    <span class="param-value" id="v-bright">1.0</span>
+                </div>
+                <input type="range" id="brightness" min="0.3" max="2.5" step="0.05" value="1.0"
+                    >
+            </div>
+            <label class="check-item">
+                <input type="checkbox" id="bg-dark" checked >
+                <span>Тёмный фон</span>
+            </label>
+        </div>
+    </div>
+
+</div><!-- /sidebar -->
+
+<!-- Status bar -->
+<div id="statusbar">
+    <span>Точек:&nbsp;<span class="sb-val" id="sb-pts">0</span></span>
+    <span class="sb-sep">·</span>
+    <span>FPS:&nbsp;<span class="sb-val" id="sb-fps">—</span></span>
+    <span class="sb-sep">·</span>
+    <span>Камера:&nbsp;<span class="sb-val" id="sb-cam">—</span></span>
+    <span id="sb-api" class="sb-val">API: проверка...</span>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════
+const API_URL     = 'http://localhost:8000';
+const BASE_POINTS = 50_000;   // начальное количество точек
+const MAX_POINTS  = 600_000;  // максимум от API
+
+// ════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════
+function switchTab(tab) {
+    document.getElementById('tab-classify').style.display = tab === 'classify' ? '' : 'none';
+    document.getElementById('tab-view').style.display     = tab === 'view'     ? '' : 'none';
+    document.getElementById('tab-classify-btn').classList.toggle('active', tab === 'classify');
+    document.getElementById('tab-view-btn').classList.toggle('active', tab === 'view');
+}
+
+function toggleCollapse(panelId, arrowId) {
+    const panel = document.getElementById(panelId);
+    const arrow = document.getElementById(arrowId);
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : '';
+    arrow.classList.toggle('open', !isOpen);
+}
+// Start collapsed
+document.getElementById('filter-panel').style.display = 'none';
+
+// ════════════════════════════════════════════════════════
+//  THREE.JS SCENE
+// ════════════════════════════════════════════════════════
+const wrap     = document.getElementById('canvas-wrap');
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0f14);
+
+const camera = new THREE.PerspectiveCamera(55, wrap.clientWidth / wrap.clientHeight, 0.1, 500000);
+camera.position.set(0, 50, 150);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+wrap.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance   = 0.5;
+controls.maxDistance   = 500000;
+controls.panSpeed      = 1.2;
+controls.zoomSpeed     = 1.1;
+
+const grid = new THREE.GridHelper(500, 40, 0x1a2030, 0x141820);
+scene.add(grid);
+
+window.addEventListener('resize', () => {
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+    needsRender = true;
+});
+
+// Drag-and-drop on canvas
+wrap.addEventListener('dragover',  e => e.preventDefault());
+wrap.addEventListener('drop', e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.las')) loadDroppedFile(f);
+});
+
+// ════════════════════════════════════════════════════════
+//  PROGRESSIVE LOD SYSTEM
+//
+//  Идея: храним ВСЕ точки в одном Float32Array (allPos, allCol).
+//  Рисуем только VISIBLE_COUNT точек через DrawRange.
+//  При приближении увеличиваем DrawRange и дорисовываем точки
+//  во вьюпорте постепенно через requestAnimationFrame.
+// ════════════════════════════════════════════════════════
+let cloud       = null;   // THREE.Points
+let allPos      = null;   // Float32Array полных координат
+let allCol      = null;   // Float32Array полных цветов (с яркостью)
+let allColRaw   = null;   // Float32Array без применения яркости
+let totalPts    = 0;
+let visiblePts  = 0;      // текущий DrawRange
+let targetPts   = 0;      // цель для плавного наращивания
+let sceneMaxSpan = 1;
+let brightness  = 1.0;
+let needsRender = true;
+let isAnimating = false;  // идёт ли плавное наращивание
+
+// LOD: при каком расстоянии сколько точек показываем
+// relDist = dist / maxDist (0..1)
+const LOD_LEVELS = [
+    { relDist: 0.02,  fraction: 1.00  },   // вплотную — все точки
+    { relDist: 0.06,  fraction: 0.70  },
+    { relDist: 0.15,  fraction: 0.35  },
+    { relDist: 0.35,  fraction: 0.15  },
+    { relDist: 1.00,  fraction: 0.05  },   // далеко — 5%
+];
+const INITIAL_FRACTION = BASE_POINTS / MAX_POINTS;  // ~8%
+
+function getLodFraction(relDist) {
+    for (const lv of LOD_LEVELS) {
+        if (relDist <= lv.relDist) return lv.fraction;
+    }
+    return LOD_LEVELS[LOD_LEVELS.length - 1].fraction;
+}
+
+function buildCloud(data) {
+    clearCloud();
+
+    const N = data.x.length;
+    if (N === 0) { toast('Сервер вернул 0 точек', 'err'); return; }
+
+    // Centre coords
+    let cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < N; i++) { cx += data.x[i]; cy += data.y[i]; cz += data.z[i]; }
+    cx /= N; cy /= N; cz /= N;
+
+    allPos = new Float32Array(N * 3);
+    allColRaw = new Float32Array(N * 3);
+    let minY = Infinity, maxY = -Infinity, maxSpan = 0;
+
+    for (let i = 0; i < N; i++) {
+        const px = data.x[i] - cx;
+        const py = data.z[i] - cz;
+        const pz = data.y[i] - cy;
+        allPos[i*3] = px; allPos[i*3+1] = py; allPos[i*3+2] = pz;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        const span = Math.max(Math.abs(px), Math.abs(py), Math.abs(pz));
+        if (span > maxSpan) maxSpan = span;
+        allColRaw[i*3]   = data.colors[i][0];
+        allColRaw[i*3+1] = data.colors[i][1];
+        allColRaw[i*3+2] = data.colors[i][2];
+    }
+    sceneMaxSpan = maxSpan;
+    totalPts     = N;
+
+    // Apply brightness to buffer
+    allCol = new Float32Array(N * 3);
+    applyBrightnessToBuffer();
+
+    // Single geometry with full capacity
+    const geo = new THREE.BufferGeometry();
+    const posAttr = new THREE.BufferAttribute(allPos, 3);
+    const colAttr = new THREE.BufferAttribute(allCol, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    colAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', posAttr);
+    geo.setAttribute('color',    colAttr);
+
+    // Start with BASE_POINTS
+    const initCount = Math.min(N, BASE_POINTS);
+    geo.setDrawRange(0, initCount);
+    visiblePts = initCount;
+    targetPts  = initCount;
+
+    const autoSize = Math.max(0.02, maxSpan * 0.002);
+    document.getElementById('pt-size').value = Math.min(2.0, autoSize).toFixed(3);
+    document.getElementById('v-ptsize').textContent = Math.min(2.0, autoSize).toFixed(2);
+
+    const mat = new THREE.PointsMaterial({
+        size: parseFloat(document.getElementById('pt-size').value),
+        vertexColors: true,
+        sizeAttenuation: true,
+    });
+    cloud = new THREE.Points(geo, mat);
+    cloud.frustumCulled = false;
+    scene.add(cloud);
+
+    // Camera
+    camera.far  = maxSpan * 40;
+    camera.near = maxSpan * 0.00005;
+    camera.updateProjectionMatrix();
+    const dist  = maxSpan * 2;
+    camera.position.set(dist * 0.6, dist * 0.4, dist);
+    controls.target.set(0, (minY + maxY) / 2, 0);
+    controls.minDistance = maxSpan * 0.002;
+    controls.maxDistance = maxSpan * 50;
+    controls.update();
+
+    grid.scale.setScalar((maxSpan * 2.5) / 500);
+    grid.position.set(0, minY, 0);
+    grid.visible = true;
+
+    document.getElementById('sb-pts').textContent = initCount.toLocaleString();
+    document.getElementById('lod-indicator').style.display = 'block';
+    needsRender = true;
+
+    // Охранные зоны: очищаем старые, активируем кнопку построения
+    if (typeof clearZones === 'function') clearZones();
+    const activeFile = document.getElementById('las-input').files[0]
+                    || document.getElementById('view-input').files[0]
+                    || null;
+    if (activeFile && typeof enableZonesButton === 'function') {
+        enableZonesButton(activeFile);
+    }
+}
+
+
+function storeCloudData(data) {
+    if (data && data.x && data.labels) {
+        currentCloudData = { x: data.x, y: data.y, z: data.z, labels: data.labels };
+    }
+}
+
+function applyBrightnessToBuffer() {
+    const N3 = allColRaw.length;
+    for (let i = 0; i < N3; i++) {
+        allCol[i] = Math.min(1, allColRaw[i] * brightness);
+    }
+    if (cloud) {
+        cloud.geometry.attributes.color.needsUpdate = true;
+        needsRender = true;
+    }
+}
+
+function clearCloud() {
+    if (cloud) {
+        scene.remove(cloud);
+        cloud.geometry.dispose();
+        cloud.material.dispose();
+        cloud = null;
+    }
+    allPos = allCol = allColRaw = null;
+    totalPts = visiblePts = targetPts = 0;
+    isAnimating = false;
+    document.getElementById('lod-indicator').style.display = 'none';
+    document.getElementById('sb-pts').textContent = '0';
+    needsRender = true;
+}
+
+// Smoothly animate DrawRange toward targetPts
+const LERP_SPEED = 0.12;
+const MIN_STEP   = 500;
+
+function tickLOD() {
+    if (!cloud || visiblePts === targetPts) { isAnimating = false; return; }
+    isAnimating = true;
+
+    const diff   = targetPts - visiblePts;
+    const step   = Math.max(MIN_STEP, Math.abs(Math.round(diff * LERP_SPEED)));
+    visiblePts   = diff > 0
+        ? Math.min(targetPts, visiblePts + step)
+        : Math.max(targetPts, visiblePts - step);
+
+    cloud.geometry.setDrawRange(0, visiblePts);
+    cloud.geometry.attributes.position.needsUpdate = false; // no need
+    document.getElementById('sb-pts').textContent = visiblePts.toLocaleString();
+    document.getElementById('lod-pts').textContent = visiblePts.toLocaleString();
+    needsRender = true;
+}
+
+function updateLOD() {
+    if (!cloud || totalPts === 0) return;
+    const dist = camera.position.distanceTo(controls.target);
+    const rel  = dist / controls.maxDistance;
+    const frac = getLodFraction(rel);
+    targetPts  = Math.min(totalPts, Math.max(BASE_POINTS, Math.round(totalPts * frac)));
+
+    const step = Math.round(totalPts / targetPts);
+    document.getElementById('lod-val').textContent = step <= 1 ? '1:1' : `1:${step}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  ANIMATION LOOP
+// ════════════════════════════════════════════════════════
+let lastCamPos = new THREE.Vector3();
+let lastRenderTime = 0;
+let frameCount = 0, fpsTimer = 0;
+
+function animate(now) {
+    requestAnimationFrame(animate);
+
+    const dt = now - lastRenderTime;
+    if (dt < 14) return; // cap ~70fps
+
+    const camMoved = !camera.position.equals(lastCamPos);
+    if (camMoved) {
+        lastCamPos.copy(camera.position);
+        needsRender = true;
+        updateLOD();
+    }
+
+    controls.update();
+    tickLOD(); // smooth LOD transition every frame
+
+    if (needsRender || isAnimating) {
+        renderer.render(scene, camera);
+        lastRenderTime = now;
+        needsRender = false;
+
+        // FPS counter
+        frameCount++;
+        if (now - fpsTimer > 1000) {
+            document.getElementById('sb-fps').textContent = frameCount;
+            frameCount = 0; fpsTimer = now;
+        }
+        // Camera pos
+        const p = camera.position;
+        document.getElementById('sb-cam').textContent =
+            `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}`;
+    }
+}
+animate(0);
+
+// ════════════════════════════════════════════════════════
+//  VIEWER CONTROLS
+// ════════════════════════════════════════════════════════
+function onPtSize(v) {
+    document.getElementById('v-ptsize').textContent = parseFloat(v).toFixed(2);
+    if (cloud) { cloud.material.size = parseFloat(v); needsRender = true; }
+}
+function onBrightness(v) {
+    document.getElementById('v-bright').textContent = parseFloat(v).toFixed(2);
+    brightness = parseFloat(v);
+    if (allColRaw) applyBrightnessToBuffer();
+}
+function onBgToggle(dark) {
+    scene.background = new THREE.Color(dark ? 0x0d0f14 : 0x8090a0);
+    needsRender = true;
+}
+
+// ════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════
+function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + type;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = '', 4500);
+}
+
+function setOverlay(show, text = '', sub = '') {
+    const ov = document.getElementById('loading-overlay');
+    ov.style.display = show ? 'flex' : 'none';
+    if (show) {
+        document.getElementById('ol-text').textContent = text;
+        document.getElementById('ol-sub').textContent  = sub;
+    }
+}
+
+function setProgress(show, text = '', pct = 0) {
+    document.getElementById('progress-wrap').style.display = show ? 'block' : 'none';
+    if (show) {
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-label').textContent = text;
+    }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function fmtN(n) { return n == null ? '—' : n.toLocaleString(); }
+
+function showStats(s, t, mode, filterStats) {
+    document.getElementById('stats-section').style.display = '';
+
+    const pw = s.powerlines != null ? s.powerlines : (s.powerlines_after ?? '—');
+    document.getElementById('s-ground').textContent = fmtN(s.ground);
+    document.getElementById('s-veg').textContent    = fmtN(s.vegetation);
+    document.getElementById('s-pw').textContent     = fmtN(pw);
+    document.getElementById('s-time').textContent   = t != null ? t + ' с' : '—';
+    document.getElementById('s-total').textContent  = fmtN(s.total);
+    document.getElementById('s-shown').textContent  = `${fmtN(s.displayed)} / ${fmtN(s.total)}`;
+
+    // badge
+    const badge = document.getElementById('stats-badge');
+    badge.textContent = mode === 'classify' ? '🧠 нейросеть' : mode === 'filter' ? '🔬 фильтр' : '📄 файл';
+
+    // Filter results
+    const fr = document.getElementById('filter-result');
+    if (filterStats) {
+        fr.style.display = '';
+        document.getElementById('fr-before').textContent  = fmtN(filterStats.powerlines_before);
+        document.getElementById('fr-after').textContent   = fmtN(filterStats.powerlines_after);
+        document.getElementById('fr-removed').textContent = fmtN(filterStats.removed);
+        // cluster table
+        if (filterStats.clusters && filterStats.clusters.length > 0) {
+            const tbody = document.getElementById('cluster-tbody');
+            tbody.innerHTML = '';
+            const limit = Math.min(filterStats.clusters.length, 15);
+            for (let i = 0; i < limit; i++) {
+                const c = filterStats.clusters[i];
+                const cls = c.is_false ? 'false' : 'real';
+                const verdict = c.is_false ? `✗ ложный` : '✓ провод';
+                tbody.innerHTML += `<tr>
+                    <td>${fmtN(c.n_points)}</td>
+                    <td>${c.linearity.toFixed(2)}</td>
+                    <td>${c.elongation.toFixed(1)}</td>
+                    <td class="${cls}">${verdict}</td>
+                </tr>`;
+            }
+            document.getElementById('cluster-mini').style.display = '';
+        }
+    } else {
+        fr.style.display = 'none';
+    }
+}
+
+function resetUI() {
+    clearCloud();
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('view-classes-section').style.display = 'none';
+    document.getElementById('btn-reset').style.display = 'none';
+    setProgress(false);
+}
+
+// ════════════════════════════════════════════════════════
+//  FILE INPUTS
+// ════════════════════════════════════════════════════════
+function setupDropZone(inputId, zoneId, iconId, mainId, subId, fnameId, btn, onFile) {
+    const input = document.getElementById(inputId);
+    const zone  = document.getElementById(zoneId);
+    const icon  = document.getElementById(iconId);
+    const main  = document.getElementById(mainId);
+    const sub   = document.getElementById(subId);
+    const fname = document.getElementById(fnameId);
+
+    function setFile(f) {
+        if (!f || !f.name.endsWith('.las')) return toast('Нужен .las файл', 'err');
+        main.style.display  = 'none';
+        sub.style.display   = 'none';
+        fname.style.display = '';
+        fname.textContent   = f.name;
+        icon.textContent    = '✅';
+        zone.classList.add('has-file');
+        if (btn) btn.disabled = false;
+        if (onFile) onFile(f);
+    }
+
+    input.addEventListener('change', () => { if (input.files[0]) setFile(input.files[0]); });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+    zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+    zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.style.borderColor = '';
+        setFile(e.dataTransfer.files[0]);
+        // also set the input
+    });
+}
+
+const btnClassify   = document.getElementById('btn-classify');
+const btnReset      = document.getElementById('btn-reset');
+const btnView       = document.getElementById('btn-view');
+const btnViewFilter = document.getElementById('btn-view-filter');
+
+setupDropZone('las-input', 'drop-zone-cls', 'drop-icon-cls', 'drop-main-cls', 'drop-sub-cls', 'drop-fname-cls', btnClassify, null);
+setupDropZone('view-input', 'drop-zone-view', 'drop-icon-view', 'drop-main-view', 'drop-sub-view', 'drop-fname-view', btnView, () => { btnViewFilter.disabled = false; });
+
+function loadDroppedFile(f) {
+    switchTab('classify');
+    // trigger via fake file
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    document.getElementById('las-input').files = dt.files;
+    document.getElementById('las-input').dispatchEvent(new Event('change'));
+}
+
+btnReset.addEventListener('click', () => {
+    resetUI();
+    ['las-input'].forEach(id => document.getElementById(id).value = '');
+    // reset drop zones
+    ['drop-zone-cls'].forEach(id => {
+        document.getElementById(id).classList.remove('has-file');
+    });
+    ['drop-icon-cls'].forEach(id => document.getElementById(id).textContent = '📂');
+    ['drop-main-cls'].forEach(id => document.getElementById(id).style.display = '');
+    ['drop-sub-cls'].forEach(id => document.getElementById(id).style.display = '');
+    ['drop-fname-cls'].forEach(id => document.getElementById(id).style.display = 'none');
+    btnClassify.disabled = true;
+});
+
+// ════════════════════════════════════════════════════════
+//  CLASSIFY
+// ════════════════════════════════════════════════════════
+btnClassify.addEventListener('click', async () => {
+    const file = document.getElementById('las-input').files[0];
+    if (!file) return;
+
+    const useFilter = document.getElementById('p-filter-enabled').checked;
+
+    btnClassify.disabled = true;
+    btnClassify.innerHTML = '<span class="spinner"></span> Классификация...';
+    setOverlay(true, 'Классификация нейросетью...', file.name);
+    setProgress(true, 'Загрузка файла на сервер...', 15);
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    let data;
+    try {
+        setProgress(true, 'Нейросетевая классификация...', 40);
+        const resp = await fetch(`${API_URL}/classify`, { method: 'POST', body: fd });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        setProgress(true, 'Получение результатов...', 75);
+        data = await resp.json();
+    } catch (e) {
+        setOverlay(false); setProgress(false);
+        btnClassify.disabled = false;
+        btnClassify.textContent = 'Классифицировать';
+        toast('Ошибка: ' + e.message, 'err');
+        return;
+    }
+
+    // If filter is enabled, run filter on server
+    if (useFilter) {
+        try {
+            setProgress(true, 'Применение геометрической фильтрации...', 85);
+            setOverlay(true, 'Фильтрация ложных ЛЭП...', 'DBSCAN кластеризация');
+
+            const params = new URLSearchParams({
+                linearity:    document.getElementById('p-lin').value,
+                elongation:   document.getElementById('p-elong').value,
+                min_points:   document.getElementById('p-minpts').value,
+                eps:          document.getElementById('p-eps').value,
+                min_samples:  3,
+                fallback_cls: document.getElementById('p-fallback').value,
+            });
+            const fd2 = new FormData();
+            fd2.append('file', file);
+
+            // We need to call /classify_filtered which does both in one step
+            // OR: just call /filter with the already-classified data
+            // Since our API classifies server-side, we'll call /classify_filtered endpoint
+            const resp2 = await fetch(`${API_URL}/classify_filtered?${params}`, { method: 'POST', body: fd2 });
+            if (resp2.ok) {
+                const data2 = await resp2.json();
+                setProgress(true, 'Рендер...', 95);
+                await sleep(20);
+                buildCloud(data2);
+                showStats(data2.stats, data2.time_s, 'classify', data2.filter_stats);
+                setOverlay(false); setProgress(false);
+                btnClassify.disabled  = false;
+                btnClassify.textContent = 'Классифицировать';
+                btnReset.style.display = '';
+                const pw = data2.filter_stats?.powerlines_after ?? data2.stats.powerlines;
+                toast(`Готово! Проводов: ${fmtN(pw)}`, 'ok');
+                return;
+            }
+            // If /classify_filtered not available, fall through to plain classify result
+        } catch (e) {
+            // Filter failed — show classify result anyway
+            console.warn('Filter failed:', e);
+        }
+    }
+
+    setProgress(true, 'Рендер облака...', 95);
+    await sleep(20);
+    storeCloudData(data);
+    buildCloud(data);
+    showStats(data.stats, data.time_s, 'classify', null);
+
+    setOverlay(false); setProgress(false);
+    btnClassify.disabled  = false;
+    btnClassify.textContent = 'Классифицировать';
+    btnReset.style.display = '';
+    toast(`Готово! Проводов: ${fmtN(data.stats.powerlines)}`, 'ok');
+});
+
+// ════════════════════════════════════════════════════════
+//  VIEW CLASSIFIED LAS
+// ════════════════════════════════════════════════════════
+const CLASS_NAMES = {
+    0:'Never classified', 1:'Unclassified', 2:'Ground',
+    3:'Low vegetation', 4:'Med vegetation', 5:'High vegetation',
+    6:'Building', 7:'Noise', 9:'Water', 10:'Rail', 11:'Road',
+    14:'Провода ЛЭП', 15:'Trans. tower', 16:'Overhead str.',
+};
+const CLASS_DOT_COLORS = {
+    0:'#555', 1:'#888', 2:'#c9a87a', 3:'#3cb371', 4:'#2E8B57',
+    5:'#1a6b3a', 6:'#c8a050', 7:'#e74c3c', 9:'#3498db',
+    10:'#777', 11:'#aaa', 14:'#FF3300', 15:'#e8c030', 16:'#cc55cc',
+};
+
+btnView.addEventListener('click', async () => {
+    const file = document.getElementById('view-input').files[0];
+    if (!file) return;
+
+    btnView.disabled = true;
+    btnView.innerHTML = '<span class="spinner"></span> Загрузка...';
+    setOverlay(true, 'Чтение файла...', file.name);
+    setProgress(true, 'Отправка файла...', 30);
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    let data;
+    try {
+        setProgress(true, 'Получение данных...', 60);
+        const resp = await fetch(`${API_URL}/view`, { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`);
+        setProgress(true, 'Рендер...', 85);
+        data = await resp.json();
+    } catch (e) {
+        setOverlay(false); setProgress(false);
+        btnView.disabled = false;
+        btnView.textContent = 'Открыть';
+        toast('Ошибка: ' + e.message, 'err');
+        return;
+    }
+
+    await sleep(20);
+    storeCloudData(data);
+    buildCloud(data);
+    showStats(data.stats, null, 'view', null);
+
+    // Classes list
+    const allCls = data.stats.all_classes || {};
+    const total  = data.stats.total;
+    let html = '';
+    for (const [cls, cnt] of Object.entries(allCls).sort((a,b) => b[1]-a[1])) {
+        const name  = CLASS_NAMES[cls] || `Класс ${cls}`;
+        const color = CLASS_DOT_COLORS[cls] || '#888';
+        const pct   = (cnt / total * 100).toFixed(1);
+        html += `<div class="stat-row">
+            <span class="stat-row-label" style="display:flex;align-items:center;gap:5px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+                ${name}
+            </span>
+            <span class="stat-row-value">${fmtN(cnt)} <span style="color:var(--text3);font-weight:400">${pct}%</span></span>
+        </div>`;
+    }
+    document.getElementById('view-classes-list').innerHTML = html;
+    document.getElementById('view-classes-section').style.display = '';
+
+    setOverlay(false); setProgress(false);
+    btnView.disabled = false;
+    btnView.textContent = 'Открыть';
+    btnReset.style.display = '';
+    toast(`Файл открыт: ${fmtN(data.stats.displayed)} точек`, 'ok');
+});
+// ════════════════════════════════════════════════════════
+//  VIEW + FILTER
+// ════════════════════════════════════════════════════════
+btnViewFilter.addEventListener('click', async () => {
+    const file = document.getElementById('view-input').files[0];
+    if (!file) return;
+
+    btnViewFilter.disabled = true;
+    btnViewFilter.innerHTML = '<span class="spinner"></span> Фильтрация...';
+    setOverlay(true, 'Геометрическая фильтрация ЛЭП...', 'DBSCAN кластеризация');
+
+    const params = new URLSearchParams({
+        linearity:    document.getElementById('p-lin').value,
+        elongation:   document.getElementById('p-elong').value,
+        min_points:   document.getElementById('p-minpts').value,
+        eps:          document.getElementById('p-eps').value,
+        min_samples:  3,
+        fallback_cls: document.getElementById('p-fallback').value,
+    });
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    let data;
+    try {
+        const resp = await fetch(`${API_URL}/filter?${params}`, { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`);
+        data = await resp.json();
+    } catch (e) {
+        setOverlay(false);
+        btnViewFilter.disabled = false;
+        btnViewFilter.textContent = '⚗ Применить фильтр к LAS';
+        toast('Ошибка: ' + e.message, 'err');
+        return;
+    }
+
+    await sleep(20);
+    storeCloudData(data);
+    buildCloud(data);
+    const s = data.stats;
+    showStats({
+        ground: null, vegetation: null,
+        powerlines: s.powerlines_after,
+        total: s.total, displayed: s.displayed
+    }, null, 'filter', {
+        powerlines_before: s.powerlines_before,
+        powerlines_after:  s.powerlines_after,
+        removed:           s.removed,
+        clusters:          data.clusters || [],
+    });
+    document.getElementById('view-classes-section').style.display = 'none';
+
+    setOverlay(false);
+    btnViewFilter.disabled = false;
+    btnViewFilter.textContent = '⚗ Применить фильтр к LAS';
+    btnReset.style.display = '';
+    const msg = s.removed > 0
+        ? `Убрано ${fmtN(s.removed)} ложных точек ЛЭП`
+        : 'Ложных срабатываний не найдено';
+    toast(msg, 'ok');
+});
+
+
+
+// ════════════════════════════════════════════════════════
+//  ОХРАННЫЕ ЗОНЫ ЛЭП
+// ════════════════════════════════════════════════════════
+
+let zoneObjects = [];          // THREE.Mesh — плоскости зон
+let currentZoneFile = null;    // последний загруженный файл (для кнопки)
+let zonesOpacity = 0.25;
+// Текущее облако — x/y/z/labels из последнего ответа сервера (после фильтрации)
+let currentCloudData = null;   // { x, y, z, labels }
+let vegObjects = [];           // Three.js объекты горизонтальной проекции
+
+const btnZones      = document.getElementById('btn-zones');
+const btnZonesClear = document.getElementById('btn-zones-clear');
+const zonesInfo     = document.getElementById('zones-info');
+const zonesBadge    = document.getElementById('zones-badge');
+
+// Активируем кнопку зон когда облако загружено
+// (вызывается из buildCloud)
+function enableZonesButton(file) {
+    currentZoneFile = file;
+    btnZones.disabled = false;
+    if (document.getElementById('btn-veg-proj')) {
+        document.getElementById('btn-veg-proj').disabled = false;
+    }
+}
+
+function clearZones() {
+    for (const m of zoneObjects) {
+        scene.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+    }
+    zoneObjects = [];
+    btnZonesClear.style.display = 'none';
+    zonesInfo.style.display = 'none';
+    zonesBadge.style.display = 'none';
+    needsRender = true;
+}
+
+function onZoneOpacity(v) {
+    document.getElementById('v-zopa').textContent = parseFloat(v).toFixed(2);
+    zonesOpacity = parseFloat(v);
+    for (const m of zoneObjects) {
+        m.material.opacity = zonesOpacity;
+    }
+    needsRender = true;
+}
+
+// Строим плоскость из параметров сервера
+function buildZonePlane(center, axisAlong, up, halfLen, halfH, color, opacity) {
+    // PlaneGeometry: ширина = 2*halfLen (вдоль провода), высота = 2*halfH
+    const geo = new THREE.PlaneGeometry(halfLen * 2, halfH * 2);
+    const mat = new THREE.MeshBasicMaterial({
+        color:       color,
+        transparent: true,
+        opacity:     opacity,
+        side:        THREE.DoubleSide,
+        depthWrite:  false,   // не перекрывает другие объекты
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+
+    // PlaneGeometry по умолчанию лежит в плоскости XY (нормаль = Z)
+    // Нам нужно повернуть её так чтобы:
+    //   - она была вертикальной (Y — вверх)
+    //   - ориентирована вдоль провода (ось axisAlong)
+    //
+    // Используем quaternion: поворачиваем стандартную нормаль (0,0,1)
+    // в нужную нормаль (перпендикуляр к проводу в горизонтальной плоскости)
+    const normalDir = new THREE.Vector3().crossVectors(
+        new THREE.Vector3(...axisAlong),
+        new THREE.Vector3(0, 1, 0)
+    ).normalize();
+
+    // Quaternion: от (0,0,1) к normalDir
+    const q = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        normalDir
+    );
+    mesh.quaternion.copy(q);
+    mesh.position.set(...center);
+    return mesh;
+}
+
+btnZones.addEventListener('click', async () => {
+    if (!currentCloudData && !currentZoneFile) {
+        toast('Сначала загрузите LAS-файл', 'err');
+        return;
+    }
+
+    clearZones();
+    btnZones.disabled = true;
+    btnZones.innerHTML = '<span class="spinner"></span> Построение...';
+
+    const distance = parseFloat(document.getElementById('p-zdist').value);
+    let data;
+    try {
+        if (currentCloudData) {
+            // Используем актуальные метки после фильтрации
+            const resp = await fetch(
+                `${API_URL}/safety_zones_from_labels?distance=${distance}&min_pts=5&eps=1.5`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentCloudData),
+                }
+            );
+            if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).detail || `HTTP ${resp.status}`);
+            data = await resp.json();
+        } else {
+            const fd = new FormData();
+            fd.append('file', currentZoneFile);
+            const params = new URLSearchParams({ distance, min_pts: 5, eps: 1.5 });
+            const resp = await fetch(`${API_URL}/safety_zones?${params}`, { method: 'POST', body: fd });
+            if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).detail || `HTTP ${resp.status}`);
+            data = await resp.json();
+        }
+    } catch (e) {
+        btnZones.disabled = false;
+        btnZones.textContent = 'Построить охранные зоны';
+        toast('Ошибка: ' + e.message, 'err');
+        return;
+    }
+
+    if (!data.planes || data.planes.length === 0) {
+        btnZones.disabled = false;
+        btnZones.textContent = 'Построить охранные зоны';
+        toast('Проводов (cls 14) не найдено в файле', 'err');
+        return;
+    }
+
+    // Цвет плоскостей — жёлтый/оранжевый (цвет предупреждения)
+    const ZONE_COLOR = 0xffaa00;
+
+    for (const pl of data.planes) {
+        // Строим две плоскости: одну по каждую сторону от провода
+        for (const centerKey of ['center_pos', 'center_neg']) {
+            const mesh = buildZonePlane(
+                pl[centerKey],         // позиция
+                pl.axis,               // вдоль провода
+                pl.up,                 // вверх
+                pl.half_length,        // полудлина
+                pl.half_height,        // полувысота
+                ZONE_COLOR,
+                zonesOpacity
+            );
+            scene.add(mesh);
+            zoneObjects.push(mesh);
+        }
+
+        // Дополнительно — рёбра плоскостей для чёткости (wireframe)
+        for (const centerKey of ['center_pos', 'center_neg']) {
+            const geoE = new THREE.PlaneGeometry(pl.half_length * 2, pl.half_height * 2);
+            const matE = new THREE.MeshBasicMaterial({
+                color: 0xff8800, wireframe: true,
+                transparent: true, opacity: 0.6,
+            });
+            const edge = new THREE.Mesh(geoE, matE);
+            const normalDir = new THREE.Vector3().crossVectors(
+                new THREE.Vector3(...pl.axis),
+                new THREE.Vector3(0, 1, 0)
+            ).normalize();
+            const q = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1), normalDir
+            );
+            edge.quaternion.copy(q);
+            edge.position.set(...pl[centerKey]);
+            scene.add(edge);
+            zoneObjects.push(edge);
+        }
+    }
+
+    needsRender = true;
+
+    const nPlanes = data.planes.length;
+    zonesInfo.innerHTML = `
+        <b>${nPlanes}</b> пролёт${nPlanes === 1 ? '' : 'ов'} ЛЭП обнаружено<br>
+        Расстояние охранной зоны: <b>${distance} м</b><br>
+        Точек проводов: <b>${fmtN(data.n_wires)}</b>
+    `;
+    zonesInfo.style.display = '';
+    zonesBadge.textContent = `${nPlanes * 2} плоскостей`;
+    zonesBadge.style.display = '';
+    btnZonesClear.style.display = '';
+
+    btnZones.disabled = false;
+    btnZones.textContent = 'Построить охранные зоны';
+    toast(`Построено ${nPlanes * 2} ограничительных плоскостей`, 'ok');
+});
+
+
+// ════════════════════════════════════════════════════════
+//  ГОРИЗОНТАЛЬНАЯ ПРОЕКЦИЯ РАСТИТЕЛЬНОСТИ
+// ════════════════════════════════════════════════════════
+let vegOpacity  = 0.30;
+let vegCache    = null;   // кеш ответа сервера — перерисовка без нового запроса
+let vegQFinal   = null;   // кватернион ориентации плоскости (не меняется при сдвиге)
+
+function onVegOpacity(v) {
+    document.getElementById('v-vegopa').textContent = parseFloat(v).toFixed(2);
+    vegOpacity = parseFloat(v);
+    for (const m of vegObjects) {
+        if (m.material && m.material.opacity !== undefined) {
+            m.material.opacity = vegOpacity;
+        }
+    }
+    needsRender = true;
+}
+
+function clearVegProjection() {
+    for (const m of vegObjects) {
+        scene.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+    }
+    vegObjects = [];
+    vegCache   = null;
+    vegQFinal  = null;
+    // сбрасываем слайдер высоты
+    const sl = document.getElementById('p-veght');
+    sl.disabled = true;
+    sl.value = sl.max;
+    document.getElementById('v-veght').textContent = '—';
+    document.getElementById('btn-veg-clear').style.display = 'none';
+    document.getElementById('veg-info').style.display = 'none';
+    needsRender = true;
+}
+
+// Перерисовывает плоскость и точки по текущей высоте слайдера (без запроса к API)
+// vegHeightOffset: смещение вниз от точки провиса, задаётся слайдером (0 = уровень провода)
+let vegHeightOffset = 0;
+
+function redrawVegAtHeight(offsetBelow) {
+    // offsetBelow: сколько метров (scene-единиц) НИЖЕ провиса опускаем плоскость
+    // 0 = плоскость на уровне точки провиса каждого пролёта
+    if (!vegCache || !vegQFinal) return;
+    vegHeightOffset = offsetBelow;
+    const data = vegCache;
+
+    for (const m of vegObjects) {
+        scene.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+    }
+    vegObjects = [];
+
+    const hw = data.plane_half_width;
+    const spans = data.spans || [];
+
+    // Строим плоскость для каждого пролёта
+    spans.forEach(span => {
+        const hl     = span.half_len;
+        const pc     = span.center_scene;
+        // planeY = точка провиса пролёта минус смещение вниз
+        const planeY = span.sag_z_scene - offsetBelow;
+
+        const planeGeo = new THREE.PlaneGeometry(hl * 2, hw * 2);
+        const planeMat = new THREE.MeshBasicMaterial({
+            color: 0x22c55e, transparent: true,
+            opacity: vegOpacity, side: THREE.DoubleSide, depthWrite: false,
+        });
+        const planeMesh = new THREE.Mesh(planeGeo, planeMat);
+        planeMesh.quaternion.copy(vegQFinal);
+        planeMesh.position.set(pc[0], planeY, pc[2]);
+        scene.add(planeMesh);
+        vegObjects.push(planeMesh);
+
+        const edgesGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(hl * 2, hw * 2));
+        const edgesMat = new THREE.LineBasicMaterial({ color: 0x4ade80 });
+        const edgesMesh = new THREE.LineSegments(edgesGeo, edgesMat);
+        edgesMesh.quaternion.copy(vegQFinal);
+        edgesMesh.position.set(pc[0], planeY + 0.02, pc[2]);
+        scene.add(edgesMesh);
+        vegObjects.push(edgesMesh);
+    });
+
+    // Минимальный порог для фиолетовых точек:
+    // точка попадает если она выше плоскости СВОЕГО ближайшего пролёта.
+    // Упрощение: используем наименьший sag минус offset (консервативно).
+    const minSagY = spans.length > 0
+        ? Math.min(...spans.map(s => s.sag_z_scene)) - offsetBelow
+        : (data.wire_height_scene || 0) - offsetBelow;
+
+    const pts = data.proj_points;
+    if (pts && pts.length > 0) {
+        const filtered = pts.filter(p => p[1] >= minSagY);
+        if (filtered.length > 0) {
+            const N = filtered.length;
+            const posArr = new Float32Array(N * 3);
+            for (let i = 0; i < N; i++) {
+                posArr[i * 3]     = filtered[i][0];
+                posArr[i * 3 + 1] = filtered[i][1];
+                posArr[i * 3 + 2] = filtered[i][2];
+            }
+            const dotGeo = new THREE.BufferGeometry();
+            dotGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+            const dotMat = new THREE.PointsMaterial({
+                color: 0xa855f7,
+                size: Math.max(0.06, (cloud ? cloud.material.size : 0.2) * 2.0),
+                sizeAttenuation: true,
+            });
+            const dots = new THREE.Points(dotGeo, dotMat);
+            dots.frustumCulled = false;
+            scene.add(dots);
+            vegObjects.push(dots);
+        }
+    }
+
+    // ── Инфо-блок: высота отображается над землёй (понятная физическая величина)
+    const groundY    = data.ground_z_scene;           // scene Y земли
+    const allInCorr  = pts ? pts.length : 0;
+    const abovePlane = pts ? pts.filter(p => p[1] >= minSagY).length : 0;
+    const pct        = allInCorr > 0 ? (abovePlane / allInCorr * 100) : 0;
+    const pctColor   = pct < 10 ? '#22c55e' : pct < 30 ? '#f59e0b' : '#ef4444';
+
+    // Высота плоскости над землёй — осмысленная физическая величина в метрах
+    const minSagAboveGround = spans.length > 0
+        ? Math.min(...spans.map(s => s.sag_above_ground)) - offsetBelow
+        : 0;
+    const heightLabel = minSagAboveGround >= 0
+        ? `${minSagAboveGround.toFixed(1)} м над землёй`
+        : `${Math.abs(minSagAboveGround).toFixed(1)} м ниже земли (ошибка данных)`;
+
+    document.getElementById('veg-info').innerHTML = `
+        Смещение от провиса: <b>${offsetBelow.toFixed(1)} м</b> вниз<br>
+        Высота плоскости: <b>${heightLabel}</b><br>
+        Пролётов: <b>${spans.length}</b><br>
+        Растительность выше плоскости: <b>${fmtN(abovePlane)}</b> / ${fmtN(allInCorr)}<br>
+        Зарастание: <b style="color:${pctColor}">${pct.toFixed(1)}%</b>
+    `;
+
+    needsRender = true;
+}
+
+document.getElementById('btn-veg-proj').addEventListener('click', async () => {
+    if (!currentCloudData) {
+        toast('Сначала загрузите и классифицируйте облако', 'err');
+        return;
+    }
+
+    clearVegProjection();
+    const btn = document.getElementById('btn-veg-proj');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Вычисление...';
+
+    const distance = parseFloat(document.getElementById('p-vegdist').value);
+
+    let data;
+    try {
+        const resp = await fetch(
+            `${API_URL}/vegetation_projection?distance=${distance}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentCloudData),
+            }
+        );
+        if (!resp.ok) throw new Error((await resp.json().catch(()=>({}))).detail || `HTTP ${resp.status}`);
+        data = await resp.json();
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Показать проекцию растительности';
+        toast('Ошибка: ' + e.message, 'err');
+        return;
+    }
+
+    // Кешируем ответ для перерисовки при сдвиге слайдера
+    vegCache = data;
+
+    // ── Кватернион ориентации плоскости (вычисляем один раз) ───────────────
+    const wireAxis   = new THREE.Vector3(...data.wire_axis_scene).normalize();
+    const qHoriz     = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0)
+    );
+    const wireAxisXZ = new THREE.Vector3(wireAxis.x, 0, wireAxis.z).normalize();
+    const qAlong     = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(1, 0, 0), wireAxisXZ
+    );
+    vegQFinal = new THREE.Quaternion().multiplyQuaternions(qAlong, qHoriz);
+
+    // ── Настраиваем слайдер смещения плоскости от провиса ─────────────────
+    // 0 = плоскость на уровне точки провиса (нижней точки каждого пролёта)
+    // max = опустить плоскость до уровня земли
+    const spans      = data.spans || [];
+    const groundY    = data.ground_z_scene;
+    const minSagY    = spans.length > 0
+        ? Math.min(...spans.map(s => s.sag_z_scene))
+        : (data.wire_height_scene || 0);
+    // Максимальное смещение вниз = расстояние от провиса до земли
+    const maxOffset  = Math.max(1, minSagY - groundY);
+
+    const sl = document.getElementById('p-veght');
+    sl.min   = '0';
+    sl.max   = maxOffset.toFixed(2);
+    sl.step  = (maxOffset / 100).toFixed(2);
+    sl.value = '0';                          // начинаем с уровня провода
+    sl.disabled = false;
+    document.getElementById('v-veght').textContent = '0.0 м вниз';
+
+    // ── Первая отрисовка: плоскость на уровне точек провиса ────────────────
+    redrawVegAtHeight(0);
+
+    document.getElementById('veg-info').style.display = '';
+    document.getElementById('btn-veg-clear').style.display = '';
+
+    btn.disabled = false;
+    btn.textContent = 'Показать проекцию растительности';
+
+    const pct = data.overgrowth_pct;
+    toast(`Зарастание просеки: ${pct.toFixed(1)}%`, pct < 10 ? 'ok' : 'err');
+});
+
+// ════════════════════════════════════════════════════════
+//  API HEALTH CHECK
+// ════════════════════════════════════════════════════════
+async function checkApi() {
+    const el = document.getElementById('sb-api');
+    try {
+        const r = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+            const d = await r.json();
+            el.innerHTML = d.model === 'ok'
+                ? `<span style="color:#22c55e">● API готов</span>`
+                : `<span style="color:#f59e0b">● API: модель не загружена</span>`;
+        } else throw new Error();
+    } catch {
+        el.innerHTML = `<span style="color:#ef4444">● API недоступен</span>`;
+        toast('Запустите: python api.py', 'err');
+    }
+}
+checkApi();
+setInterval(checkApi, 15000);
+
+// ════════════════════════════════════════════════════════
+//  WIRE UP ALL EVENT HANDLERS (replaces inline attrs)
+// ════════════════════════════════════════════════════════
+(function() {
+    function on(id, evt, fn) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(evt, fn);
+    }
+    function oninput(id, fn) { on(id, 'input', fn); }
+
+    // Tabs
+    on('tab-classify-btn', 'click', () => switchTab('classify'));
+    on('tab-view-btn',     'click', () => switchTab('view'));
+
+    // Filter collapse
+    const ft = document.querySelector('.collapse-toggle');
+    if (ft) ft.addEventListener('click', () => toggleCollapse('filter-panel','filter-arrow'));
+
+    // Clear buttons
+    on('btn-zones-clear', 'click', clearZones);
+    on('btn-veg-clear',   'click', clearVegProjection);
+
+    // bg toggle
+    on('bg-dark', 'change', function() { onBgToggle(this.checked); });
+
+    // Viewer sliders
+    oninput('pt-size',    function() { onPtSize(this.value); });
+    oninput('brightness', function() { onBrightness(this.value); });
+
+    // Filter param sliders
+    oninput('p-lin',    function() { document.getElementById('v-lin').textContent = this.value; });
+    oninput('p-elong',  function() { document.getElementById('v-elong').textContent = parseFloat(this.value).toFixed(1); });
+    oninput('p-minpts', function() { document.getElementById('v-minpts').textContent = this.value; });
+    oninput('p-eps',    function() { document.getElementById('v-eps').textContent = parseFloat(this.value).toFixed(1); });
+
+    // Zone sliders
+    oninput('p-zdist',   function() { document.getElementById('v-zdist').textContent = parseFloat(this.value).toFixed(1); });
+    oninput('p-zopa',    function() { onZoneOpacity(this.value); });
+    oninput('p-vegdist', function() { document.getElementById('v-vegdist').textContent = parseFloat(this.value).toFixed(1); });
+    oninput('p-vegopa',  function() { onVegOpacity(this.value); });
+    oninput('p-veght', function() {
+        const v = parseFloat(this.value);
+        document.getElementById('v-veght').textContent = v.toFixed(1) + ' м вниз';
+        redrawVegAtHeight(v);
+    });
+})();
+
+</script>
+</body>
+</html>
