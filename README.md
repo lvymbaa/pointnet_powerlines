@@ -118,16 +118,13 @@
 ## Структура репозитория
 
 ```
-distributive/
-├── Инструкция пользователя.pdf     # руководство пользователя (установка, эксплуатация, API)
-└── app/
-    ├── api.py                      # FastAPI-бэкенд: инференс, фильтрация, охранные зоны
-    ├── index.html                  # веб-интерфейс и 3D-визуализация (Three.js)
-    ├── server.js                   # статический HTTP-сервер для index.html
-    ├── pointnet_colab.py           # скрипт обучения PointNet (экспорт из ноутбука)
-    ├── pointnet_colab.ipynb        # ноутбук обучения для Google Colab
-    └── checkpoints/
-        └── best_powerlines.pt      # предобученные веса модели PointNet
+├── api.py                      # FastAPI-бэкенд: инференс, фильтрация, охранные зоны
+├── index.html                  # веб-интерфейс и 3D-визуализация (Three.js)
+├── server.js                   # статический HTTP-сервер для index.html
+├── pointnet_colab.py           # скрипт обучения PointNet (экспорт из ноутбука)
+├── pointnet_colab.ipynb        # ноутбук обучения для Google Colab
+└── checkpoints/
+    └── best_powerlines.pt      # предобученные веса модели PointNet
 ```
 
 > Рекомендуемая структура для развёртывания (см. раздел «Установка»): файл весов должен находиться в поддиректории `checkpoints_fast/` относительно `api.py`, либо путь необходимо изменить в константе `CHECKPOINT`.
